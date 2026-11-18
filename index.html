@@ -33,6 +33,7 @@ svg{width:100%;height:100%;display:block}
 .btn:active{transform:translateY(2px);border-bottom-width:2px}
 .btn.g{--c:#58CC02;--d:#58A700}.btn.b{--c:#1CB0F6;--d:#1899D6}.btn.o{--c:#FF9600;--d:#CC7900}.btn.r{--c:#FF4B4B;--d:#EA2B2B}
 .btn.rot{padding:7px 11px;font-size:17px;line-height:1}
+.mc{max-height:94vh;overflow:auto}
 .btn.big{width:100%;font-size:17px;padding:13px;border-radius:20px;border-bottom-width:5px}
 
 /* Bàn cờ nằm phẳng */
@@ -295,7 +296,7 @@ function timeModal(){
     TC=TCS[+b.dataset.i];try{localStorage.setItem('cvTC',b.dataset.i)}catch(e){}
     M.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===b));snd(800,.05);
   });
-  $('#tn').onclick=()=>{setClock();showClocks();coinModal()};
+  $('#tn').onclick=()=>{setClock();showClocks();BOT?botStart():coinModal()};
 }
 
 /* ===== Ván mới + tung đồng xu ===== */
@@ -307,7 +308,7 @@ function init(){
 function newGame(){
   PL.innerHTML='';FX.innerHTML='';PE={};
   G={b:init(),turn:'w',cr:{wK:1,wQ:1,bK:1,bQ:1},ep:null,half:0,hist:{},cap:{w:[],b:[]},sel:null,moves:[],last:null,chk:null,on:0,busy:0,over:0,first:'w',t:{w:0,b:0},inc:0,unl:0,tick:0};
-  setClock();layout();render();trays();timeModal();
+  setClock();layout();render();trays();if(BW){BW.terminate();BW=null}modeModal();
 }
 function coinModal(){
   modal(`<h2>Ai đi trước?</h2><div class="stage"><div class="coin"><i class="f">${svg('K','w')}</i><i class="f k">${svg('K','b')}</i></div></div><div id="res"><button class="btn b big" id="fl">Tung đồng xu</button></div>`,0);
@@ -341,6 +342,7 @@ BD.addEventListener('pointerdown',e=>{
   if(!q||!G.on||G.busy||G.over)return;tap(+q.dataset.r,+q.dataset.c);
 });
 function tap(r,c){
+  if(BOT&&G.turn==BOT.side)return;
   const p=G.b[r][c],mv=G.moves.find(m=>m.y==r&&m.x==c);
   if(G.sel&&mv)return mv.f=='promo'?askPromo(mv):exec(mv);
   if(p&&p.c==G.turn){
@@ -487,6 +489,58 @@ function warn(o){
     w.animate([{transform:b+' scale(.3)',opacity:0},{offset:.2,transform:b+' scale(1.25)',opacity:1},{offset:.35,transform:b+' scale(1)'},{offset:.85,transform:b+' scale(1)',opacity:1},{transform:b+' scale(.9)',opacity:0}],{duration:1500,fill:'both'}).onfinish=()=>w.remove();
   }
 }
+/* ===== Chế độ 1 người: máy tự tính nước đi (Web Worker, chạy offline, đúng luật ăn Vua) ===== */
+let BOT=null,BW=null,BID=0,BM={m:2,l:3};
+try{const s=JSON.parse(localStorage.getItem('cvBM'));if(s&&s.m&&s.l)BM=s}catch(e){}
+const LVN=[['Tập sự','~600'],['Dễ','~900'],['Vừa','~1200'],['Khó','~1500'],['Rất khó','~1800'],['Cao thủ','~2000+']];
+function botUI(){$('#pb .nm').textContent=NAME.b;pb.querySelectorAll('[data-a]').forEach(b=>b.style.display=BOT?'none':'')}
+function modeModal(){
+  BOT=null;NAME.b='Đen';botUI();let md=BM.m,lv=BM.l;
+  modal(`<h2>Chế độ chơi</h2><div class="tcg" style="grid-template-columns:1fr 1fr"><button class="chip" data-m="2">2 người<small>chung máy</small></button><button class="chip" data-m="1">1 người<small>đấu với máy</small></button></div><div id="lv" style="width:100%"><p style="font-size:14px;margin-bottom:6px">Độ khó (Elo ước lượng)</p><div class="tcg" style="grid-template-columns:repeat(3,1fr)">${LVN.map((x,i)=>`<button class="chip" data-l="${i+1}">${x[0]}<small>${x[1]}</small></button>`).join('')}</div></div><button class="btn b big" id="mn">Tiếp tục</button>`,0);
+  const up=()=>{M.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',+b.dataset.m==md));M.querySelectorAll('[data-l]').forEach(b=>b.classList.toggle('on',+b.dataset.l==lv));$('#lv').style.display=md==1?'':'none'};
+  M.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{md=+b.dataset.m;snd(800,.05);up()});
+  M.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{lv=+b.dataset.l;snd(800,.05);up()});
+  up();
+  $('#mn').onclick=()=>{BM={m:md,l:lv};try{localStorage.setItem('cvBM',JSON.stringify(BM))}catch(e){}BOT=md==1?{side:'b',lvl:lv}:null;NAME.b=BOT?'Máy · '+LVN[lv-1][0]:'Đen';botUI();timeModal()};
+}
+function botStart(){hide();G.first='w';G.turn='w';G.on=1;G.tick=performance.now();clockLoop();G.hist[key()]=1;snd(880,.1);render();intro()}
+function botGo(g){
+  if(g!==G||G.over||!G.on||!BOT||G.turn!=BOT.side)return;
+  if(G.busy||M.classList.contains('show'))return setTimeout(()=>botGo(g),250);
+  const id=++BID,rem=G.unl?9e9:G.t[BOT.side],fb=()=>{const al=[];G.b.forEach((row,r)=>row.forEach((p,c)=>{if(p&&p.c==BOT.side)legal(G.b,r,c,G).forEach(m=>al.push(m))}));return al[Math.floor(Math.random()*al.length)]};
+  $('#pb .nm').textContent='Máy · đang nghĩ…';
+  const go=m=>{if(g!==G)return;$('#pb .nm').textContent=NAME.b;if(!m||G.over||G.turn!=BOT.side)return;exec(m,'Q')};
+  try{
+    if(!BW)BW=new Worker(URL.createObjectURL(new Blob([`const KN=${JSON.stringify(KN)},DG=${JSON.stringify(DG)},ST=${JSON.stringify(ST)};const inb=${inb};\n${pseudo}\n${apply}\n(${botEngine})()`],{type:'text/javascript'})));
+    BW.onmessage=e=>{if(e.data.id===id)go(e.data.m)};BW.onerror=()=>go(fb());
+    BW.postMessage({id,b:G.b,turn:BOT.side,ep:G.ep,cr:G.cr,lvl:BOT.lvl,tm:Math.max(250,Math.min(9e9,rem*.03))});
+  }catch(e){go(fb())}
+}
+function botEngine(){
+  const V={P:100,N:320,B:330,R:500,Q:900,K:0},Z={wK:0,wQ:0,bK:0,bQ:0},LV=[{d:1,t:400,mg:450,rp:.25},{d:2,t:700,mg:180,rp:.08},{d:3,t:1200,mg:60,rp:0},{d:5,t:2200,mg:0,rp:0},{d:7,t:4000,mg:0,rp:0},{d:12,t:8000,mg:0,rp:0}];
+  let N=0,T=0;
+  const ev=(b,col)=>{let s=0;for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=b[r][c];if(!p)continue;const cen=7-Math.abs(c-3.5)-Math.abs(r-3.5);let v=V[p.t];
+    if(p.t=='P'){const a=p.c=='w'?6-r:r-1;v+=a*8+(a>=4?a*12:0)+cen*2}else if(p.t=='N'||p.t=='B')v+=cen*6;else if(p.t=='Q')v+=cen;
+    s+=p.c==col?v:-v}return s};
+  const gen=(b,col,st)=>{const m=[];for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=b[r][c];if(p&&p.c==col)for(const x of pseudo(b,r,c,st))m.push(x)}return m};
+  const sc=(b,m)=>{const t=b[m.y][m.x];return(t?10*V[t.t]-V[b[m.r][m.c].t]/10:0)+(m.f=='promo'?800:0)};
+  const srt=(b,ms)=>{const k=new Map(ms.map(m=>[m,sc(b,m)]));return ms.sort((x,y)=>k.get(y)-k.get(x))};
+  const nst=m=>({ep:m.f=='dbl'?[(m.r+m.y)/2,m.c]:null,cr:Z});
+  const qs=(b,col,al,be,ply,qd)=>{let s=ev(b,col);if(s>=be)return s;if(s>al)al=s;if(qd<=0)return s;const o=col=='w'?'b':'w';
+    for(const m of srt(b,gen(b,col,{ep:null,cr:Z}).filter(m=>b[m.y][m.x]))){if(b[m.y][m.x].t=='K')return 1e5-ply;const v=-qs(apply(b,m),o,-be,-al,ply+1,qd-1);if(v>=be)return v;if(v>al)al=v}return al};
+  const sr=(b,col,d,al,be,ply,st)=>{if((++N&1023)==0&&Date.now()>T)throw 1;if(d<=0)return qs(b,col,al,be,ply,4);const o=col=='w'?'b':'w',ms=gen(b,col,st);if(!ms.length)return 0;let best=-1e9;
+    for(const m of srt(b,ms)){if(b[m.y][m.x]&&b[m.y][m.x].t=='K')return 1e5-ply;const v=-sr(apply(b,m),o,d-1,-be,-al,ply+1,nst(m));if(v>best){best=v;if(v>al)al=v}if(al>=be)break}return best};
+  self.onmessage=e=>{const{id,b,turn,ep,cr,lvl,tm}=e.data,o=turn=='w'?'b':'w',Lv=LV[lvl-1],root=gen(b,turn,{ep,cr});
+    const kc=root.find(m=>b[m.y][m.x]&&b[m.y][m.x].t=='K');if(kc)return postMessage({id,m:kc});if(!root.length)return postMessage({id,m:null});
+    root.sort(()=>Math.random()-.5);srt(b,root);let best=root[0],scores=null;T=Date.now()+Math.min(tm,Lv.t);N=0;const full=lvl<=3;
+    try{for(let dd=1;dd<=Lv.d;dd++){const res=[];let al=-1e9,bm=null,bs=-1e9;
+      for(const m of root){const v=-sr(apply(b,m),o,dd-1,-1e9,full?1e9:-al,1,nst(m));res.push([m,v]);if(v>bs){bs=v;bm=m;al=v}}
+      best=bm;scores=res;root.splice(root.indexOf(bm),1);root.unshift(bm);if(bs>9e4)break}}catch(x){}
+    let pick=best;
+    if(scores&&full){const top=Math.max(...scores.map(s=>s[1])),c=scores.filter(s=>s[1]>=top-Lv.mg).map(s=>s[0]);pick=c[Math.floor(Math.random()*c.length)]}
+    if(Lv.rp&&Math.random()<Lv.rp)pick=root[Math.floor(Math.random()*root.length)];
+    postMessage({id,m:pick})};
+}
 function exec(m,pt){
   if(!G.unl&&tickNow())return;
   G.busy=1;const g=G,b=G.b,p=b[m.r][m.c],cp=m.f=='ep'?b[m.r][m.x]:b[m.y][m.x],mover=G.turn;
@@ -520,6 +574,7 @@ function exec(m,pt){
   if(cp&&cp.t=='K')capFx('K',m,550);
   if(ck&&!end)setTimeout(()=>{if(g===G)warn(o)},420);
   setTimeout(()=>{g.busy=0},300);
+  if(BOT&&!end&&G.turn==BOT.side)setTimeout(()=>botGo(g),650);
   if(end)setTimeout(()=>finish(end),cp?1150:800);
 }
 function finish(e){
