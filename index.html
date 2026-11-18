@@ -32,6 +32,7 @@ svg{width:100%;height:100%;display:block}
 .btn{--c:#58CC02;--d:#58A700;border:0;border-bottom:4px solid var(--d);background:var(--c);color:#fff;font:inherit;font-size:13px;padding:7px 12px;border-radius:99px;cursor:pointer;touch-action:manipulation}
 .btn:active{transform:translateY(2px);border-bottom-width:2px}
 .btn.g{--c:#58CC02;--d:#58A700}.btn.b{--c:#1CB0F6;--d:#1899D6}.btn.o{--c:#FF9600;--d:#CC7900}.btn.r{--c:#FF4B4B;--d:#EA2B2B}
+.btn.rot{padding:7px 11px;font-size:17px;line-height:1}
 .btn.big{width:100%;font-size:17px;padding:13px;border-radius:20px;border-bottom-width:5px}
 
 /* Bàn cờ nằm phẳng */
@@ -195,12 +196,14 @@ function insuf(b){const l=[];b.forEach((row,r)=>row.forEach((p,c)=>{if(p&&p.t!='
   return !l.length||(l.length==1&&(l[0][0]=='B'||l[0][0]=='N'))||l.every(x=>x[0]=='B'&&x[1]==l[0][1])}
 
 /* ===== Dựng giao diện ===== */
-const ROT=()=>innerWidth>innerHeight?{w:-90,b:90}:{w:0,b:180};
+let LO=null;try{const s=localStorage.getItem('cvLO');if(s=='land'||s=='port')LO=s}catch(e){}
+const LAND=()=>LO?LO=='land':innerWidth>innerHeight;  /* mặc định tự theo màn hình; bấm nút xoay để ép ngang/dọc */
+const ROT=()=>LAND()?{w:-90,b:90}:{w:0,b:180};
 let G,PE={};
 const cells=[];
 function mkPanel(c){
   const d=document.createElement('div');d.className='panel';d.id='p'+c;
-  d.innerHTML=`<div class="pin"><div class="row"><span class="nm">${NAME[c]}</span><b class="clk">--</b><span class="sp"></span><button class="btn o" data-a="new">Ván mới</button><button class="btn r" data-a="res">Đầu hàng</button></div><div class="tray"></div></div>`;
+  d.innerHTML=`<div class="pin"><div class="row"><span class="nm">${NAME[c]}</span><b class="clk">--</b><span class="sp"></span><button class="btn b rot" data-rot="1" title="Xoay ngang/dọc">⟳</button><button class="btn o" data-a="new">Ván mới</button><button class="btn r" data-a="res">Đầu hàng</button></div><div class="tray"></div></div>`;
   return d;
 }
 const pb=mkPanel('b'),pw=mkPanel('w'),bw=document.createElement('div');bw.id='bw';
@@ -212,7 +215,7 @@ for(let r=0;r<8;r++)for(let c=0;c<8;c++){const q=document.createElement('div');q
 
 // Bố cục tự động theo cạnh dài của màn hình
 function layout(){
-  const W=innerWidth,H=innerHeight,land=W>H,P=118,pad=10,R=ROT();
+  const W=innerWidth,H=innerHeight,land=LAND(),P=118,pad=10,R=ROT();
   const B=Math.floor(land?Math.min(H-pad*2,W-2*P-pad*4):Math.min(W-pad*2,H-2*P-pad*4));
   A.className=land?'land':'port';
   bw.style.cssText=`width:${B}px;height:${B}px;margin:${pad}px;transform:rotate(${land?-90:0}deg)`;
@@ -287,7 +290,7 @@ function clockLoop(){
   CI=setInterval(()=>{if(!G||!G.on||G.over||G.unl)return;if(!tickNow())showClocks()},100);
 }
 function timeModal(){
-  modal(`<h2>Chọn thời gian</h2><div class="tcg">${TCS.map((t,i)=>`<button class="chip${t===TC?' on':''}" data-i="${i}">${t.l}<small>${t.n}</small></button>`).join('')}</div><button class="btn b big" id="tn">Tiếp tục</button>`,0);
+  modal(`<h2>Chọn thời gian</h2><div class="tcg">${TCS.map((t,i)=>`<button class="chip${t===TC?' on':''}" data-i="${i}">${t.l}<small>${t.n}</small></button>`).join('')}</div><button class="btn o big" data-rot="1">⟳ Xoay ngang/dọc</button><button class="btn b big" id="tn">Tiếp tục</button>`,0);
   M.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
     TC=TCS[+b.dataset.i];try{localStorage.setItem('cvTC',b.dataset.i)}catch(e){}
     M.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===b));snd(800,.05);
@@ -453,7 +456,7 @@ function capFly(cp,by){
   g.cap[by].push(cp);trays(cp.id);
   const it=$('#p'+by+' .tray i[data-id="'+cp.id+'"]');if(!it){el.remove();return}
   const tr=it.getBoundingClientRect(),tx=tr.left+tr.width/2,ty=tr.top+tr.height/2,sx=a.left+w/2,sy=a.top+w/2;
-  const r0=innerWidth>innerHeight?-90:0,r1=ROT()[by],sc=tr.width/w;
+  const r0=LAND()?-90:0,r1=ROT()[by],sc=tr.width/w;
   const cl=document.createElement('div');cl.className='fl';cl.innerHTML=svg(cp.t,cp.c);
   cl.style.cssText=`width:${w}px;height:${w}px;left:${sx-w/2}px;top:${sy-w/2}px;visibility:hidden`;
   document.body.append(cl);
@@ -525,6 +528,7 @@ function finish(e){
   $('#nw').onclick=newGame;
 }
 
+document.addEventListener('click',e=>{if(!e.target.closest('[data-rot]'))return;LO=LAND()?'port':'land';try{localStorage.setItem('cvLO',LO)}catch(_){}snd(700,.05);layout()});
 /* ===== Nút chức năng (bấm 2 lần để xác nhận) ===== */
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-a]');if(!b||!G||G.over)return;
