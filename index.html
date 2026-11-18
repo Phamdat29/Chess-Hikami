@@ -291,7 +291,7 @@ function clockLoop(){
   CI=setInterval(()=>{if(!G||!G.on||G.over||G.unl)return;if(!tickNow())showClocks()},100);
 }
 function timeModal(){
-  modal(`<h2>Chọn thời gian</h2><div class="tcg">${TCS.map((t,i)=>`<button class="chip${t===TC?' on':''}" data-i="${i}">${t.l}<small>${t.n}</small></button>`).join('')}</div><button class="btn o big" data-rot="1">⟳ Xoay ngang/dọc</button><button class="btn b big" id="tn">Tiếp tục</button>`,0);
+  modal(`<h2>Chọn thời gian</h2><div class="tcg">${TCS.map((t,i)=>`<button class="chip${t===TC?' on':''}" data-i="${i}">${t.l}<small>${t.n}</small></button>`).join('')}</div><button class="btn b big" id="tn">Tiếp tục</button>`,0);
   M.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
     TC=TCS[+b.dataset.i];try{localStorage.setItem('cvTC',b.dataset.i)}catch(e){}
     M.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===b));snd(800,.05);
@@ -308,7 +308,7 @@ function init(){
 function newGame(){
   PL.innerHTML='';FX.innerHTML='';PE={};
   G={b:init(),turn:'w',cr:{wK:1,wQ:1,bK:1,bQ:1},ep:null,half:0,hist:{},cap:{w:[],b:[]},sel:null,moves:[],last:null,chk:null,on:0,busy:0,over:0,first:'w',t:{w:0,b:0},inc:0,unl:0,tick:0};
-  setClock();layout();render();trays();if(BW){BW.terminate();BW=null}modeModal();
+  setClock();layout();render();trays();if(BW){BW.terminate();BW=null}orientModal();
 }
 function coinModal(){
   modal(`<h2>Ai đi trước?</h2><div class="stage"><div class="coin"><i class="f">${svg('K','w')}</i><i class="f k">${svg('K','b')}</i></div></div><div id="res"><button class="btn b big" id="fl">Tung đồng xu</button></div>`,0);
@@ -494,6 +494,13 @@ let BOT=null,BW=null,BID=0,BM={m:2,l:3};
 try{const s=JSON.parse(localStorage.getItem('cvBM'));if(s&&s.m&&s.l)BM=s}catch(e){}
 const LVN=[['Tập sự','~600'],['Dễ','~900'],['Vừa','~1200'],['Khó','~1500'],['Rất khó','~1800'],['Cao thủ','~2000+']];
 function botUI(){$('#pb .nm').textContent=NAME.b;pb.querySelectorAll('[data-a]').forEach(b=>b.style.display=BOT?'none':'')}
+function orientModal(){
+  let o=LO||'auto';
+  modal(`<h2>Hướng màn hình</h2><div class="tcg" style="grid-template-columns:1fr"><button class="chip" data-o="auto">Tự động<small>theo màn hình (mặc định)</small></button><button class="chip" data-o="land">Ngang<small>bàn cờ nằm ngang</small></button><button class="chip" data-o="port">Dọc<small>bàn cờ nằm dọc</small></button></div><button class="btn b big" id="on">Tiếp tục</button>`,0);
+  const up=()=>M.querySelectorAll('[data-o]').forEach(b=>b.classList.toggle('on',b.dataset.o==o));
+  M.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{o=b.dataset.o;LO=o=='auto'?null:o;try{o=='auto'?localStorage.removeItem('cvLO'):localStorage.setItem('cvLO',o)}catch(e){}snd(800,.05);up();layout()});
+  up();$('#on').onclick=modeModal;
+}
 function modeModal(){
   BOT=null;NAME.b='Đen';botUI();let md=BM.m,lv=BM.l;
   modal(`<h2>Chế độ chơi</h2><div class="tcg" style="grid-template-columns:1fr 1fr"><button class="chip" data-m="2">2 người<small>chung máy</small></button><button class="chip" data-m="1">1 người<small>đấu với máy</small></button></div><div id="lv" style="width:100%"><p style="font-size:14px;margin-bottom:6px">Độ khó (Elo ước lượng)</p><div class="tcg" style="grid-template-columns:repeat(3,1fr)">${LVN.map((x,i)=>`<button class="chip" data-l="${i+1}">${x[0]}<small>${x[1]}</small></button>`).join('')}</div></div><button class="btn b big" id="mn">Tiếp tục</button>`,0);
