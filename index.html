@@ -524,7 +524,7 @@ function botGo(g){
   }catch(e){go(fb())}
 }
 function botEngine(){
-  const V={P:100,N:320,B:330,R:500,Q:900,K:0},Z={wK:0,wQ:0,bK:0,bQ:0},LV=[{d:1,t:400,mg:450,rp:.25},{d:2,t:700,mg:180,rp:.08},{d:3,t:1200,mg:60,rp:0},{d:5,t:2200,mg:0,rp:0},{d:7,t:4000,mg:0,rp:0},{d:12,t:8000,mg:0,rp:0}];
+  const V={P:100,N:320,B:330,R:500,Q:900,K:0},Z={wK:0,wQ:0,bK:0,bQ:0},LV=[{d:1,t:400,mg:450,rp:.25},{d:2,t:700,mg:180,rp:.08},{d:3,t:1200,mg:60,rp:0},{d:6,t:1500,mg:0,rp:0},{d:9,t:2500,mg:0,rp:0},{d:14,t:4500,mg:0,rp:0}];
   let N=0,T=0;
   const ev=(b,col)=>{let s=0;for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=b[r][c];if(!p)continue;const cen=7-Math.abs(c-3.5)-Math.abs(r-3.5);let v=V[p.t];
     if(p.t=='P'){const a=p.c=='w'?6-r:r-1;v+=a*8+(a>=4?a*12:0)+cen*2}else if(p.t=='N'||p.t=='B')v+=cen*6;else if(p.t=='Q')v+=cen;
@@ -538,11 +538,11 @@ function botEngine(){
   const sr=(b,col,d,al,be,ply,st)=>{if((++N&1023)==0&&Date.now()>T)throw 1;if(d<=0)return qs(b,col,al,be,ply,4);const o=col=='w'?'b':'w',ms=gen(b,col,st);if(!ms.length)return 0;let best=-1e9;
     for(const m of srt(b,ms)){if(b[m.y][m.x]&&b[m.y][m.x].t=='K')return 1e5-ply;const v=-sr(apply(b,m),o,d-1,-be,-al,ply+1,nst(m));if(v>best){best=v;if(v>al)al=v}if(al>=be)break}return best};
   self.onmessage=e=>{const{id,b,turn,ep,cr,lvl,tm}=e.data,o=turn=='w'?'b':'w',Lv=LV[lvl-1],root=gen(b,turn,{ep,cr});
-    const kc=root.find(m=>b[m.y][m.x]&&b[m.y][m.x].t=='K');if(kc)return postMessage({id,m:kc});if(!root.length)return postMessage({id,m:null});
-    root.sort(()=>Math.random()-.5);srt(b,root);let best=root[0],scores=null;T=Date.now()+Math.min(tm,Lv.t);N=0;const full=lvl<=3;
+    const kc=root.find(m=>b[m.y][m.x]&&b[m.y][m.x].t=='K');if(kc)return postMessage({id,m:kc});if(!root.length)return postMessage({id,m:null});if(root.length==1)return postMessage({id,m:root[0]});
+    root.sort(()=>Math.random()-.5);srt(b,root);let best=root[0],scores=null,stab=0;const t0=Date.now();T=t0+Math.min(tm,Lv.t*(.75+Math.random()*.5));N=0;const full=lvl<=3;
     try{for(let dd=1;dd<=Lv.d;dd++){const res=[];let al=-1e9,bm=null,bs=-1e9;
       for(const m of root){const v=-sr(apply(b,m),o,dd-1,-1e9,full?1e9:-al,1,nst(m));res.push([m,v]);if(v>bs){bs=v;bm=m;al=v}}
-      best=bm;scores=res;root.splice(root.indexOf(bm),1);root.unshift(bm);if(bs>9e4)break}}catch(x){}
+      stab=bm===best?stab+1:0;best=bm;scores=res;root.splice(root.indexOf(bm),1);root.unshift(bm);const el=Date.now()-t0;if(bs>9e4||(dd>=3&&((stab>=2&&el>Lv.t*.12)||(stab>=1&&el>Lv.t*.35))))break}}catch(x){}
     let pick=best;
     if(scores&&full){const top=Math.max(...scores.map(s=>s[1])),c=scores.filter(s=>s[1]>=top-Lv.mg).map(s=>s[0]);pick=c[Math.floor(Math.random()*c.length)]}
     if(Lv.rp&&Math.random()<Lv.rp)pick=root[Math.floor(Math.random()*root.length)];
@@ -581,7 +581,7 @@ function exec(m,pt){
   if(cp&&cp.t=='K')capFx('K',m,550);
   if(ck&&!end)setTimeout(()=>{if(g===G)warn(o)},420);
   setTimeout(()=>{g.busy=0},300);
-  if(BOT&&!end&&G.turn==BOT.side)setTimeout(()=>botGo(g),650);
+  if(BOT&&!end&&G.turn==BOT.side)setTimeout(()=>botGo(g),400);
   if(end)setTimeout(()=>finish(end),cp?1150:800);
 }
 function finish(e){
